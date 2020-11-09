@@ -6,6 +6,8 @@
 package ucar.nc2.grib.grib2;
 
 import javax.annotation.Nullable;
+
+import javafx.util.Pair;
 import ucar.nc2.grib.GribNumbers;
 import ucar.nc2.grib.GribUtils;
 import ucar.nc2.iosp.BitReader;
@@ -17,6 +19,8 @@ import java.io.InputStream;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Reads the data from one grib2 record. Original code almost for sure came from GEMPAK, but the
@@ -30,13 +34,18 @@ import java.util.Arrays;
  */
 public class Grib2DataReader {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Grib2DataReader.class);
-
+  private static ConcurrentMap<Pair<String, Long>, float[]> dataCache;
   // look up table: 2**i - 1
   private static final int[] bitsmv1 = new int[31];
   static {
     for (int i = 0; i < 31; i++) {
       bitsmv1[i] = (int) java.lang.Math.pow((double) 2, (double) i) - 1;
     }
+    dataCache = new ConcurrentHashMap<>();
+  }
+
+  public static void tearDown() {
+    dataCache.clear();
   }
 
   ///////////////////////////////////////////////
@@ -94,33 +103,38 @@ public class Grib2DataReader {
 
     raf.seek(startPos + 5); // skip past first 5 bytes in data section, now ready to read
 
-    float[] data;
-    switch (dataTemplate) {
-      case 0:
-        data = getData0(raf, (Grib2Drs.Type0) gdrs);
-        break;
-      case 2:
-        data = getData2(raf, (Grib2Drs.Type2) gdrs);
-        break;
-      case 3:
-        data = getData3(raf, (Grib2Drs.Type3) gdrs);
-        break;
-      case 40:
-        data = getData40(raf, (Grib2Drs.Type40) gdrs);
-        break;
-      case 41:
-        data = getData41(raf, (Grib2Drs.Type0) gdrs);
-        break;
-      case 50002:
-        data = getData50002(raf, (Grib2Drs.Type50002) gdrs);
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported DRS type = " + dataTemplate);
-    }
+    Pair datOfInterest = new Pair(raf.getLocation(), raf.getFilePointer());
 
+    float[] data = dataCache.get(datOfInterest);
+    if(data == null) {
+      switch (dataTemplate) {
+        case 0:
+          data = getData0(raf, (Grib2Drs.Type0) gdrs);
+          break;
+        case 2:
+          data = getData2(raf, (Grib2Drs.Type2) gdrs);
+          break;
+        case 3:
+          data = getData3(raf, (Grib2Drs.Type3) gdrs);
+          break;
+        case 40:
+          data = getData40(raf, (Grib2Drs.Type40) gdrs);
+          break;
+        case 41:
+          data = getData41(raf, (Grib2Drs.Type0) gdrs);
+          break;
+        case 50002:
+          data = getData50002(raf, (Grib2Drs.Type50002) gdrs);
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported DRS type = " + dataTemplate);
+      }
+      scanningModeCheck(data, scanMode, nx);
+      dataCache.put(datOfInterest, data);
+    }
+    //data = Arrays.copyOf(data, data.length);
     // int scanMode = gds.getGds().getScanMode();
     // int nx = gds.getGds().getNx(); // needs some smarts for different type Grids
-    scanningModeCheck(data, scanMode, nx);
 
     return data;
   }
