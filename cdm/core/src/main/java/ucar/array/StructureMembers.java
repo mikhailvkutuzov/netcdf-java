@@ -20,7 +20,7 @@ import ucar.ma2.DataType;
 import ucar.nc2.Structure;
 import ucar.nc2.Variable;
 
-/** A Collection of members contained in StructureData. */
+/** A collection of members contained in StructureData. */
 @Immutable
 public final class StructureMembers implements Iterable<Member> {
 
@@ -39,6 +39,7 @@ public final class StructureMembers implements Iterable<Member> {
   ////////////////////////////////////////////////////////////////////////
 
   /** Get the StructureMembers' name. */
+  @Nullable
   public String getName() {
     return name;
   }
@@ -72,7 +73,7 @@ public final class StructureMembers implements Iterable<Member> {
     return members.stream().filter(m -> m.name.equals(memberName)).findFirst().orElse(null);
   }
 
-  /** Get the total size of the Structure in bytes. */
+  /** Get the total size of one Structure in bytes. */
   public int getStorageSizeBytes() {
     return structureSize;
   }
@@ -105,6 +106,7 @@ public final class StructureMembers implements Iterable<Member> {
     return Objects.hashCode(name, structureSize, structuresOnHeap, members);
   }
 
+  /** Iterate over the Members. */
   @Override
   public Iterator<Member> iterator() {
     return members.iterator();
@@ -114,7 +116,7 @@ public final class StructureMembers implements Iterable<Member> {
   @Immutable
   public final static class Member {
     private final String name, desc, units;
-    private final DataType dtype;
+    private final DataType dataType;
     private final int index;
     private final int length;
     private final int[] shape;
@@ -122,7 +124,7 @@ public final class StructureMembers implements Iterable<Member> {
     private final ByteOrder byteOrder; // needed by StructureDataArray
     private final int offset; // needed by StructureDataArray
     private final int storageSizeInBytes; // needed by StructureDataArray
-    private final boolean isVariableLength;
+    private final boolean isVlen;
 
     private Member(MemberBuilder builder, int index, boolean structuresOnHeap) {
       this.index = index;
@@ -130,7 +132,7 @@ public final class StructureMembers implements Iterable<Member> {
       this.name = Preconditions.checkNotNull(builder.name);
       this.desc = builder.desc;
       this.units = builder.units;
-      this.dtype = Preconditions.checkNotNull(builder.dataType);
+      this.dataType = Preconditions.checkNotNull(builder.dataType);
       this.shape = builder.shape != null ? builder.shape : new int[0];
       this.members = builder.members != null ? builder.members.build() : null;
       this.byteOrder = builder.byteOrder;
@@ -138,20 +140,23 @@ public final class StructureMembers implements Iterable<Member> {
 
       // calculated
       this.length = (int) ucar.ma2.Index.computeSize(shape);
-      this.isVariableLength = (shape.length > 0 && shape[shape.length - 1] < 0);
+      this.isVlen = (dataType != DataType.OPAQUE) && (dataType != DataType.SEQUENCE)
+          && (shape.length > 0 && shape[shape.length - 1] < 0);
       this.storageSizeInBytes = builder.getStorageSizeBytes(structuresOnHeap);
     }
 
     /** Turn into a mutable Builder. Can use toBuilder().build() to copy. */
     public MemberBuilder toBuilder() {
-      MemberBuilder b = new MemberBuilder().setName(this.name).setDesc(this.desc).setUnits(this.units)
-          .setDataType(this.dtype).setShape(this.shape).setByteOrder(this.getByteOrder()).setOffset(this.getOffset());
+      MemberBuilder b =
+          new MemberBuilder().setName(this.name).setDesc(this.desc).setUnits(this.units).setDataType(this.dataType)
+              .setShape(this.shape).setByteOrder(this.getByteOrder()).setOffset(this.getOffset());
       if (this.members != null) {
         b.setStructureMembers(this.members.toBuilder());
       }
       return b;
     }
 
+    /** Get nested StructureMembers, if this is a Structure or Sequence. */
     @Nullable
     public StructureMembers getStructureMembers() {
       return members;
@@ -176,7 +181,7 @@ public final class StructureMembers implements Iterable<Member> {
 
     /** Get the DataType. */
     public DataType getDataType() {
-      return dtype;
+      return dataType;
     }
 
     /** Get the index in the Members list. */
@@ -194,29 +199,42 @@ public final class StructureMembers implements Iterable<Member> {
       return length;
     }
 
-    public boolean isVariableLength() {
-      return isVariableLength;
+    /** If its a variable length array. */
+    public boolean isVlen() {
+      return isVlen;
     }
 
+    /** The ByteOrder used when storing in StructureDataStorageBB. */
     public ByteOrder getByteOrder() {
       return byteOrder;
     }
 
+    /** The offset from the start of th STructure, used when storing in StructureDataStorageBB. */
     public int getOffset() {
       return offset;
     }
 
     /**
      * Get the total size in bytes needed for storing the data in this Member.
-     * A Sequence, String and Vlen are always stored on the heap, so this returns 4 bytes used for the heap index.
+     * A Sequence, String Opaque, and Vlen are always stored on the heap, so this returns 4 bytes used for the heap
+     * index.
      * A Structure may be stored on the heap, depending on StructureMembers.isStructuresOnHeap().
-     * If true, then takes 4 bytes. If false, then this will be the sum of the member's sizes, including nested
+     * If true, then takes 4 bytes. If false, then this will be the sum of the member's sizes (including nested
+     * Structures) times the number of Strutures.
+     *
+     * If the Member is a nested Structure, then this is the size of one Structure times the number of nested
      * Structures.
      *
      * @return total size in bytes
      */
     public int getStorageSizeBytes() {
       return storageSizeInBytes;
+    }
+
+    /** Convenience method for members.getStorageSizeBytes(). Throws exception if not a Structure. */
+    public int getStructureSize() {
+      Preconditions.checkNotNull(this.members);
+      return members.getStorageSizeBytes();
     }
 
     /** Is this a scalar (size == 1). */
@@ -238,19 +256,20 @@ public final class StructureMembers implements Iterable<Member> {
       }
       Member member = (Member) o;
       return index == member.index && length == member.length && offset == member.offset
-          && storageSizeInBytes == member.storageSizeInBytes && isVariableLength == member.isVariableLength
+          && storageSizeInBytes == member.storageSizeInBytes && isVlen == member.isVlen
           && Objects.equal(name, member.name) && Objects.equal(desc, member.desc) && Objects.equal(units, member.units)
-          && dtype == member.dtype && Objects.equal(shape, member.shape) && Objects.equal(members, member.members)
+          && dataType == member.dataType && Objects.equal(shape, member.shape) && Objects.equal(members, member.members)
           && Objects.equal(byteOrder, member.byteOrder);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(name, desc, units, dtype, index, length, shape, members, byteOrder, offset,
-          storageSizeInBytes, isVariableLength);
+      return Objects.hashCode(name, desc, units, dataType, index, length, shape, members, byteOrder, offset,
+          storageSizeInBytes, isVlen);
     }
   }
 
+  /** A builder for StructureMembers.Member */
   public static class MemberBuilder {
     private String name, desc, units;
     private DataType dataType;
@@ -307,6 +326,7 @@ public final class StructureMembers implements Iterable<Member> {
       return this;
     }
 
+    /** The offset of the member in the ByteBuffer. If a StructureArray, then for the first record. */
     public MemberBuilder setOffset(int offset) {
       this.offset = offset;
       return this;
@@ -317,6 +337,8 @@ public final class StructureMembers implements Iterable<Member> {
       int length = (shape == null) ? 1 : (int) Arrays.computeSize(shape);
 
       if (isVariableLength) {
+        return 4;
+      } else if (dataType == DataType.OPAQUE) {
         return 4;
       } else if (dataType == DataType.SEQUENCE) {
         return 4;
@@ -446,32 +468,22 @@ public final class StructureMembers implements Iterable<Member> {
     }
 
     /** Set structureSize and offsets yourself, or call setStandardOffsets. */
-    public int setStandardOffsets(boolean structuresOnHeap) {
-      return setStandardOffsets(structuresOnHeap, 0);
-    }
-
-    private int setStandardOffsets(boolean structuresOnHeap, int start) {
+    public Builder setStandardOffsets(boolean structuresOnHeap) {
       this.structuresOnHeap = structuresOnHeap;
-      int offset = start;
-      int totalSize = 0;
+      int offset = 0;
       for (MemberBuilder m : members) {
         m.setOffset(offset);
-
-        if (m.dataType.equals(DataType.SEQUENCE)) {
-          m.getStructureMembers().setStandardOffsets(structuresOnHeap, 0);
-        } else if (m.dataType.equals(DataType.STRUCTURE)) {
-          m.getStructureMembers().setStandardOffsets(structuresOnHeap, structuresOnHeap ? 0 : offset);
+        if (m.dataType == DataType.SEQUENCE || m.dataType == DataType.STRUCTURE) {
+          m.getStructureMembers().setStandardOffsets(structuresOnHeap);
         }
-
         offset += m.getStorageSizeBytes(structuresOnHeap);
-        totalSize += m.getStorageSizeBytes(structuresOnHeap);
       }
-      setStructureSize(totalSize);
-      return offset;
+      setStructureSize(offset);
+      return this;
     }
 
     /** Get the total size of the Structure in bytes. */
-    private int getStorageSizeBytes(boolean structuresOnHeap) {
+    public int getStorageSizeBytes(boolean structuresOnHeap) {
       return members.stream().mapToInt(m -> m.getStorageSizeBytes(structuresOnHeap)).sum();
     }
 

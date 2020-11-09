@@ -15,6 +15,7 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 import ucar.ma2.Array;
+import ucar.ma2.ArrayObject;
 import ucar.ma2.ArrayStructure;
 import ucar.ma2.DataType;
 import ucar.ma2.Index;
@@ -60,11 +61,9 @@ public class Structure extends Variable {
     return members.size();
   }
 
-  /** Get the size in bytes of one element of the Structure. */
+  /** Get the size in bytes of one Structure. */
   @Override
   public int getElementSize() {
-    if (elementSize <= 0)
-      calcElementSize();
     return elementSize;
   }
 
@@ -89,7 +88,9 @@ public class Structure extends Variable {
    * directly from the StructureData or ArrayStructure.
    *
    * @return a StructureMembers object that describes this Structure.
+   * @deprecated use StructureMembers().makeStructureMembers(Structure structure)
    */
+  @Deprecated
   public StructureMembers makeStructureMembers() {
     StructureMembers.Builder builder = StructureMembers.builder().setName(getShortName());
     for (Variable v2 : this.getVariables()) {
@@ -135,25 +136,9 @@ public class Structure extends Variable {
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-  protected int calcStructureSize() {
-    int structureSize = 0;
-    for (Variable member : members) {
-      structureSize += member.getSize() * member.getElementSize();
-    }
-    return structureSize;
-  }
-
-  /**
-   * Force recalculation of size of one element of this structure - equals the sum of sizes of its members.
-   * This is used only by low level classes like IOSPs.
-   */
-  private void calcElementSize() {
-    int total = 0;
-    for (Variable v : members) {
-      total += v.getElementSize() * v.getSize();
-    }
-    elementSize = total;
+  /** Calculation of size of one element of this structure - equals the sum of sizes of its members. */
+  private int calcElementSize() {
+    return ucar.array.StructureMembers.makeStructureMembers(this).getStorageSizeBytes(false);
   }
 
   //////////////////////////////////////////////////////////////////////////////////////
@@ -166,7 +151,9 @@ public class Structure extends Variable {
    * @return ith StructureData
    * @throws java.io.IOException on read error
    * @throws ucar.ma2.InvalidRangeException if index out of range
+   * @deprecated use readArray(Section)
    */
+  @Deprecated
   public StructureData readStructure(int index) throws IOException, ucar.ma2.InvalidRangeException {
     Section.Builder sb = Section.builder();
 
@@ -183,8 +170,13 @@ public class Structure extends Variable {
     }
 
     Array dataArray = read(sb.build());
-    ArrayStructure data = (ArrayStructure) dataArray;
-    return data.getStructureData(0);
+    if (dataArray instanceof ArrayStructure) {
+      ArrayStructure data = (ArrayStructure) dataArray;
+      return data.getStructureData(0);
+    } else if (dataArray instanceof ArrayObject) {
+      return (StructureData) dataArray.getObject(0);
+    }
+    throw new RuntimeException("Unknown structure array class " + dataArray.getClass().getName());
   }
 
   /**
@@ -196,7 +188,9 @@ public class Structure extends Variable {
    * @return the StructureData recordsfrom start to start+count-1
    * @throws java.io.IOException on read error
    * @throws ucar.ma2.InvalidRangeException if start, count out of range
+   * @deprecated use readArray(Section)
    */
+  @Deprecated
   public ArrayStructure readStructure(int start, int count) throws IOException, ucar.ma2.InvalidRangeException {
     Preconditions.checkArgument(getRank() <= 1, "not a vector structure");
     int[] origin = {start};
@@ -217,7 +211,9 @@ public class Structure extends Variable {
    * @return StructureDataIterator over type StructureData
    * @throws java.io.IOException on read error
    * @see #getStructureIterator(int bufferSize)
+   * @deprecated use readArray().iterator()
    */
+  @Deprecated
   public StructureDataIterator getStructureIterator() throws java.io.IOException {
     return getStructureIterator(defaultBufferSize);
   }
@@ -241,7 +237,9 @@ public class Structure extends Variable {
    * @param bufferSize size in bytes to buffer, set < 0 to use default size
    * @return StructureDataIterator over type StructureData
    * @throws java.io.IOException on read error
+   * @deprecated use readArray().iterator()
    */
+  @Deprecated
   public StructureDataIterator getStructureIterator(int bufferSize) throws java.io.IOException {
     return (getRank() < 2) ? new Structure.IteratorRank1(bufferSize) : new IteratorRankAny();
   }
@@ -307,7 +305,7 @@ public class Structure extends Variable {
     public void setBufferSize(int bytes) {
       if (count > 0)
         return; // too late
-      int structureSize = calcStructureSize();
+      int structureSize = getElementSize();
       if (structureSize <= 0)
         structureSize = 1; // no members in the psuedo-structure LOOK is this ok?
       if (bytes <= 0)
@@ -432,8 +430,8 @@ public class Structure extends Variable {
     this.members = builder.vbuilders.stream().map(vb -> vb.build(parentGroup)).collect(ImmutableList.toImmutableList());
     memberHash = new HashMap<>();
     this.members.forEach(m -> memberHash.put(m.getShortName(), m));
-    if (elementSize <= 0) {
-      calcElementSize();
+    if (builder.elementSize <= 0) {
+      this.elementSize = calcElementSize();
     }
     this.isSubset = builder.isSubset;
   }

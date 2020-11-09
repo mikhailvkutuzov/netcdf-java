@@ -8,7 +8,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import org.junit.Test;
 
-/** Test {@link ucar.nc2.util.CancelTask}, {@link ucar.nc2.util.DebugFlags}, {@link ucar.nc2.util.NamedObject} */
+/** Test {@link ucar.nc2.util.CancelTask}, {@link ucar.nc2.util.DebugFlags} */
 public class TestInterfaces {
 
   @Test
@@ -34,22 +34,4 @@ public class TestInterfaces {
     assertThat(flags.isSet("two")).isTrue();
     assertThat(flags.isSet("one")).isFalse();
   }
-
-  @Test
-  public void testNamedObject() {
-    Object what = new Object();
-    NamedObject named = NamedObject.create("name", "desc", what);
-    assertThat(named.getName()).isEqualTo("name");
-    assertThat(named.getDescription()).isEqualTo("desc");
-    assertThat(named.getValue() == what).isTrue();
-
-    String thing = "what";
-    NamedObject namedThing = NamedObject.create(thing, "descr");
-    assertThat(namedThing.getName()).isEqualTo("what");
-    assertThat(namedThing.getDescription()).isEqualTo("descr");
-    assertThat(namedThing.getValue() == thing).isTrue();
-
-  }
-
-
 }

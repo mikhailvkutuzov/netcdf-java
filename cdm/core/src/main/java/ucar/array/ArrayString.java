@@ -11,7 +11,7 @@ import ucar.ma2.DataType;
 
 /** Concrete implementation of Array specialized for Strings. */
 @Immutable
-public class ArrayString extends Array<String> {
+public final class ArrayString extends Array<String> {
   private final Storage<String> storage;
 
   /** Create an empty Array of type String and the given shape. */
@@ -23,19 +23,19 @@ public class ArrayString extends Array<String> {
   /** Create an Array of type String and the given shape and storage. */
   public ArrayString(int[] shape, Storage<String> storage) {
     super(DataType.STRING, shape);
-    Preconditions.checkArgument(indexFn.length() <= storage.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storage.length());
     this.storage = storage;
   }
 
   /** Create an Array of type String and the given indexFn and storage. */
   private ArrayString(IndexFn indexFn, Storage<String> storageD) {
     super(DataType.STRING, indexFn);
-    Preconditions.checkArgument(indexFn.length() <= storageD.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageD.length());
     this.storage = storageD;
   }
 
   @Override
-  public Iterator<String> fastIterator() {
+  Iterator<String> fastIterator() {
     return storage.iterator();
   }
 
@@ -75,8 +75,8 @@ public class ArrayString extends Array<String> {
 
   /** create new Array with given IndexFn and the same backing store */
   @Override
-  protected ArrayString createView(IndexFn indexFn) {
-    return new ArrayString(indexFn, storage);
+  protected ArrayString createView(IndexFn view) {
+    return new ArrayString(view, storage);
   }
 
   // used when the data is not in canonical order
@@ -96,7 +96,7 @@ public class ArrayString extends Array<String> {
 
   // standard storage using String[] primitive array
   @Immutable
-  static class StorageS implements Storage<String> {
+  static final class StorageS implements Storage<String> {
     private final String[] storage;
 
     StorageS(String[] storage) {
@@ -104,7 +104,7 @@ public class ArrayString extends Array<String> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return storage.length;
     }
 

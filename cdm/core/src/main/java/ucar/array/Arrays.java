@@ -4,43 +4,62 @@
  */
 package ucar.array;
 
-import com.google.common.base.Preconditions;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import ucar.ma2.DataType;
-import ucar.ma2.InvalidRangeException;
-import ucar.ma2.Range;
-import ucar.ma2.Section;
+
+import com.google.auto.value.AutoValue;
+import com.google.common.base.Preconditions;
+import ucar.ma2.*;
 
 /** Static helper classes for {@link Array} */
 public class Arrays {
 
-  public static Array<?> convert(ucar.ma2.Array from) {
-    DataType dtype = from.getDataType();
-    if (dtype == DataType.OPAQUE) {
-      return convertOpaque(from);
-    } else {
-      return factory(dtype, from.getShape(), from.get1DJavaArray(dtype));
-    }
-  }
-
-  public static Array<?> convertOpaque(ucar.ma2.Array from) {
-    DataType dtype = from.getDataType();
-    Preconditions.checkArgument(dtype == DataType.OPAQUE);
-    if (from instanceof ucar.ma2.ArrayObject) {
-      ucar.ma2.ArrayObject ma2 = (ucar.ma2.ArrayObject) from;
-      byte[][] dataArray = new byte[(int) ma2.getSize()][];
-      for (int idx = 0; idx < ma2.getSize(); idx++) {
-        ByteBuffer bb = (ByteBuffer) ma2.getObject(idx);
-        bb.rewind();
-        byte[] raw = new byte[bb.remaining()];
-        bb.get(raw);
-        dataArray[idx] = raw;
+  /**
+   * Create Array using java array of T, or java primitive array, as storage.
+   * Do not use this for Vlens or Structures.
+   *
+   * @param dataType data type of the data. Vlen detected from the shape.
+   * @param shape multidimensional shape, must have same total length as dataArray.
+   * @param storage storage for type T.
+   */
+  public static <T> Array<T> factory(DataType dataType, int[] shape, Storage<T> storage) {
+    switch (dataType) {
+      case OPAQUE:
+      case BOOLEAN:
+      case BYTE:
+      case ENUM1:
+      case UBYTE: {
+        return (Array<T>) new ArrayByte(dataType, shape, (Storage<Byte>) storage);
       }
-      return ArrayVlen.factory(dtype, ma2.getShape(), dataArray);
+      case CHAR: {
+        return (Array<T>) new ArrayChar(shape, (Storage<Character>) storage);
+      }
+      case DOUBLE: {
+        return (Array<T>) new ArrayDouble(shape, (Storage<Double>) storage);
+      }
+      case FLOAT: {
+        return (Array<T>) new ArrayFloat(shape, (Storage<Float>) storage);
+      }
+      case INT:
+      case ENUM4:
+      case UINT: {
+        return (Array<T>) new ArrayInteger(dataType, shape, (Storage<Integer>) storage);
+      }
+      case LONG:
+      case ULONG: {
+        return (Array<T>) new ArrayLong(dataType, shape, (Storage<Long>) storage);
+      }
+      case SHORT:
+      case ENUM2:
+      case USHORT: {
+        return (Array<T>) new ArrayShort(dataType, shape, (Storage<Short>) storage);
+      }
+      case STRING: {
+        return (Array<T>) new ArrayString(shape, (Storage<String>) storage);
+      }
+      default:
+        throw new RuntimeException("Unimplemented DataType " + dataType);
     }
-    throw new RuntimeException("Unknown opaque array class " + from.getClass().getName());
   }
 
   /**
@@ -95,7 +114,7 @@ public class Arrays {
         return (Array<T>) new ArrayString(shape, storageS);
       }
       default:
-        throw new RuntimeException("Unimplemented DataType " + dataType);
+        throw new RuntimeException("Unimplemented DataType= " + dataType);
     }
   }
 
@@ -148,8 +167,10 @@ public class Arrays {
   ////////////////////////////////////////////////////////////////////////////////////////
   // Experimental
 
-  /** Combine list of Array's by copying the underlying Array's into a single primitive array */
-  public static <T> Array<T> factoryCopy(DataType dataType, int[] shape, List<Array<?>> dataArrays) {
+  /**
+   * Combine list of Array's by copying the underlying Array's into a single primitive array
+   */
+  public static <T> Array<T> factoryCopy(DataType dataType, int[] shape, List<Array<T>> dataArrays) {
     if (dataArrays.size() == 1) {
       return factory(dataType, shape, dataArrays.get(0).storage());
     }
@@ -157,7 +178,7 @@ public class Arrays {
     return factory(dataType, shape, dataArray);
   }
 
-  private static Object combine(DataType dataType, int[] shape, List<Array<?>> dataArrays) {
+  private static <T> Object combine(DataType dataType, int[] shape, List<Array<T>> dataArrays) {
     Section section = new Section(shape);
     long size = section.getSize();
     if (size > Integer.MAX_VALUE) {
@@ -211,10 +232,13 @@ public class Arrays {
 
   // The only advantage over copying AFAICT is that it can handle arrays > 2G. as long as its broken up into
   // multiple arrays < 2G.
-  /** Experimental: keep list of Arrays seperate. This allows length > 2Gb. */
+
+  /**
+   * Experimental: keep list of Arrays seperate. This allows length > 2Gb.
+   */
   public static <T> Array<T> factoryArrays(DataType dataType, int[] shape, List<Array<?>> dataArrays) {
     if (dataArrays.size() == 1) {
-      return factory(dataType, shape, dataArrays.get(0).storage());
+      return factory(dataType, shape, (Storage<T>) dataArrays.get(0).storage());
     }
 
     switch (dataType) {
@@ -356,13 +380,9 @@ public class Arrays {
     return product;
   }
 
-  public static boolean isVariableLength(int[] shape) {
-    return shape.length > 0 && shape[shape.length - 1] < 0;
-  }
-
   /**
    * If there are any VLEN dimensions (length < 0), remove it and all dimensions to the right.
-   * 
+   *
    * @param shape
    * @return modified shape, if needed.
    */
@@ -381,4 +401,147 @@ public class Arrays {
     System.arraycopy(shape, 0, newshape, 0, prefixrank);
     return newshape;
   }
+
+  public static Object copyPrimitiveArray(Array<?> data) {
+    DataType dataType = data.getDataType();
+    int idx = 0;
+    switch (dataType) {
+      case ENUM1:
+      case UBYTE:
+      case BYTE: {
+        Array<Byte> bdata = (Array<Byte>) data;
+        byte[] parray = new byte[(int) data.length()];
+        for (byte val : bdata) {
+          parray[idx++] = val;
+        }
+        return parray;
+      }
+      case CHAR: {
+        Array<Character> cdata = (Array<Character>) data;
+        char[] parray = new char[(int) data.length()];
+        for (char val : cdata) {
+          parray[idx++] = val;
+        }
+        return parray;
+      }
+      case ENUM2:
+      case USHORT:
+      case SHORT: {
+        Array<Short> sdata = (Array<Short>) data;
+        short[] parray = new short[(int) data.length()];
+        for (short val : sdata) {
+          parray[idx++] = val;
+        }
+        return parray;
+      }
+      case ENUM4:
+      case UINT:
+      case INT: {
+        Array<Integer> idata = (Array<Integer>) data;
+        int[] parray = new int[(int) data.length()];
+        for (int val : idata) {
+          parray[idx++] = val;
+        }
+        return parray;
+      }
+      case ULONG:
+      case LONG: {
+        Array<Long> ldata = (Array<Long>) data;
+        long[] parray = new long[(int) data.length()];
+        for (long val : ldata) {
+          parray[idx++] = val;
+        }
+        return parray;
+      }
+      case FLOAT: {
+        Array<Float> fdata = (Array<Float>) data;
+        float[] parray = new float[(int) data.length()];
+        for (float val : fdata) {
+          parray[idx++] = val;
+        }
+        return parray;
+      }
+      case DOUBLE: {
+        Array<Double> ddata = (Array<Double>) data;
+        double[] parray = new double[(int) data.length()];
+        for (double val : ddata) {
+          parray[idx++] = val;
+        }
+        return parray;
+      }
+      case STRING: {
+        Array<String> sdata = (Array<String>) data;
+        String[] parray = new String[(int) data.length()];
+        for (String val : sdata) {
+          parray[idx++] = val;
+        }
+        return parray;
+      }
+      default:
+        throw new IllegalStateException("Unimplemented datatype " + dataType);
+    }
+  }
+
+  /** Convert a numeric array to double values. */
+  public static Array<Double> toDouble(Array<?> array) {
+    if (array instanceof ArrayDouble) {
+      return (Array<Double>) array;
+    }
+    Array<Number> conv = (Array<Number>) array;
+    int n = (int) array.length();
+    double[] storage = new double[n];
+    int count = 0;
+    for (Number val : conv) {
+      storage[count++] = val.doubleValue();
+    }
+    return factory(DataType.DOUBLE, new int[] {n}, storage);
+  }
+
+  @AutoValue
+  public static abstract class MinMax {
+    public abstract double min();
+
+    public abstract double max();
+
+    public static MinMax create(double min, double max) {
+      return new AutoValue_Arrays_MinMax(min, max);
+    }
+
+    @Override
+    public String toString() {
+      return "MinMax{" + "min=" + min() + ", max=" + max() + '}';
+    }
+  }
+
+  public static MinMax getMinMaxSkipMissingData(Array<? extends Number> a, IsMissingEvaluator eval) {
+    Preconditions.checkNotNull(a);
+    boolean hasEval = (eval == null || !eval.hasMissing());
+    double max = -Double.MAX_VALUE;
+    double min = Double.MAX_VALUE;
+    if (a instanceof ArrayDouble) {
+      ArrayDouble ad = (ArrayDouble) a;
+      for (double val : ad) {
+        if (hasEval && eval.isMissing(val)) {
+          continue;
+        }
+        if (val > max)
+          max = val;
+        if (val < min)
+          min = val;
+      }
+    } else {
+      for (Number number : a) {
+        double val = number.doubleValue();
+        if (hasEval && eval.isMissing(val)) {
+          continue;
+        }
+        if (val > max)
+          max = val;
+        if (val < min)
+          min = val;
+      }
+    }
+    return MinMax.create(min, max);
+  }
+
 }

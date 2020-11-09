@@ -4,7 +4,15 @@
  */
 package ucar.nc2.dataset;
 
-import ucar.ma2.*;
+import ucar.ma2.Array;
+import ucar.ma2.ArrayChar;
+import ucar.ma2.DataType;
+import ucar.ma2.Index;
+import ucar.ma2.IndexIterator;
+import ucar.ma2.InvalidRangeException;
+import ucar.ma2.MAMath;
+import ucar.ma2.Range;
+import ucar.ma2.Section;
 import ucar.nc2.Group;
 import ucar.nc2.constants.AxisType;
 import ucar.nc2.constants.CF;
@@ -28,8 +36,10 @@ import java.io.IOException;
  * variable
  * bounds(ncoords,2). These contain the cell bounds, and must be ascending or descending as the coordinate values are.
  * In this case isContiguous() is true when bounds1(i+1) == bounds2(i) for all i.
+ * 
+ * @deprecated use GridAxis1D
  */
-
+@Deprecated
 public class CoordinateAxis1D extends CoordinateAxis {
   private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CoordinateAxis1D.class);
 
@@ -394,7 +404,6 @@ public class CoordinateAxis1D extends CoordinateAxis {
      * }
      * }
      */
-
     double distance = coordValue - this.start;
     double exactNumSteps = distance / this.increment;
     int index = (int) Math.round(exactNumSteps);
@@ -680,8 +689,7 @@ public class CoordinateAxis1D extends CoordinateAxis {
     if (getDataType() != DataType.DOUBLE)
       cachedData = MAMath.convert(cachedData, getDataType());
 
-    // LOOK should be "pinned" meaning cant be purged
-    builder.setCachedData(cachedData, true);
+    builder.setSourceData(cachedData);
 
     // LOOK repalce in parentGroup? too late for that.
     return builder.build(this.getParentGroup());
@@ -787,24 +795,6 @@ public class CoordinateAxis1D extends CoordinateAxis {
       value1[i] = data.getDouble(ima.set1(0));
       value2[i] = data.getDouble(ima.set1(1));
     }
-
-    /*
-     * flip if needed
-     * boolean firstLower = true; // in the first interval, is lower < upper ?
-     * for (int i = 0; i < value1.length; i++) {
-     * if (Misc.nearlyEquals(value1[i], value2[i])) continue; // skip when lower == upper
-     * firstLower = value1[i] < value2[i];
-     * break;
-     * }
-     * // check first against last : lower, unless all lower equal then upper
-     * boolean goesUp = (n < 2) || value1[n - 1] > value1[0] || (Misc.nearlyEquals(value1[n - 1], value2[0]) && value2[n
-     * - 1] > value2[0]);
-     * if (goesUp != firstLower) {
-     * double[] temp = value1;
-     * value1 = value2;
-     * value2 = temp;
-     * }
-     */
 
     // decide if they are contiguous
     boolean contig = true;

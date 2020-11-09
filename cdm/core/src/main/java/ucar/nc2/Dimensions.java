@@ -2,11 +2,11 @@
 package ucar.nc2;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Formatter;
-import java.util.List;
-import java.util.Optional;
-import java.util.StringTokenizer;
+
+import java.util.*;
 import javax.annotation.Nullable;
+
+import com.google.common.collect.ImmutableSet;
 import ucar.ma2.InvalidRangeException;
 import ucar.ma2.Range;
 import ucar.ma2.Section;
@@ -71,17 +71,19 @@ public class Dimensions {
   }
 
   /** Make a space-delineated String from a list of Dimension names, inverse of makeDimensionsList(). */
-  public static String makeDimensionsString(List<Dimension> dimensions) {
+  public static String makeDimensionsString(Iterable<Dimension> dimensions) {
     if (dimensions == null)
       return "";
 
+    int count = 0;
     Formatter buf = new Formatter();
-    for (int i = 0; i < dimensions.size(); i++) {
-      Dimension myd = dimensions.get(i);
+    for (Dimension myd : dimensions) {
       String dimName = myd.getShortName();
 
-      if (i != 0)
+      if (count != 0) {
         buf.format(" ");
+      }
+      count++;
 
       if (myd.isVariableLength()) {
         buf.format("*");
@@ -168,5 +170,44 @@ public class Dimensions {
 
     for (int i = 0; i < v.getRank(); i++)
       result.add(v.getDimension(i));
+  }
+
+  /**
+   * Test if all the Dimensions in subset are in set
+   * 
+   * @param subset is this a subset
+   * @param set of this?
+   */
+  public static boolean isSubset(Collection<Dimension> subset, Collection<Dimension> set) {
+    for (Dimension d : subset) {
+      if (!(set.contains(d))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Test if all the Strings in subset are in set
+   * 
+   * @param subset is this a subset
+   * @param set of this?
+   */
+  public static boolean isSubset(Set<String> subset, Set<String> set) {
+    for (String d : subset) {
+      if (!(set.contains(d))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Make the set of Dimensions used by axes. */
+  public static ImmutableSet<Dimension> makeDomain(Iterable<? extends Variable> axes) {
+    ImmutableSet.Builder<Dimension> domain = ImmutableSet.builder();
+    for (Variable axis : axes) {
+      domain.addAll(axis.getDimensions());
+    }
+    return domain.build();
   }
 }

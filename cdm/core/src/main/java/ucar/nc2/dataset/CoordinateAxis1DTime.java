@@ -9,12 +9,19 @@ import com.google.common.collect.ImmutableList;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ucar.ma2.Array;
+import ucar.ma2.ArrayChar;
+import ucar.ma2.ArrayObject;
+import ucar.ma2.DataType;
+import ucar.ma2.Index;
+import ucar.ma2.IndexIterator;
+import ucar.ma2.InvalidRangeException;
+import ucar.ma2.Range;
 import ucar.nc2.Group;
 import ucar.nc2.constants.AxisType;
 import ucar.nc2.time.*;
 import ucar.nc2.units.TimeUnit;
 import ucar.nc2.Dimension;
-import ucar.ma2.*;
 import java.util.*;
 import java.io.IOException;
 
@@ -23,7 +30,10 @@ import java.io.IOException;
  * Its coordinate values can be represented as Dates.
  * <p/>
  * May use udunit dates, or ISO Strings.
+ * 
+ * @deprecated use GridAxis1DTime
  */
+@Deprecated
 public class CoordinateAxis1DTime extends CoordinateAxis1D {
 
   private static final Logger logger = LoggerFactory.getLogger(CoordinateAxis1DTime.class);
@@ -247,6 +257,7 @@ public class CoordinateAxis1DTime extends CoordinateAxis1D {
 
   ////////////////////////////////////////////////////////////////////////
 
+  // TODO move to builder
   private List<CalendarDate> makeTimesFromChar(VariableDS org, Formatter errMessages) throws IOException {
     int ncoords = (int) org.getSize();
     int rank = org.getRank();
@@ -257,15 +268,15 @@ public class CoordinateAxis1DTime extends CoordinateAxis1D {
 
     ArrayChar data = (ArrayChar) org.read();
     ArrayChar.StringIterator ii = data.getStringIterator();
-    ArrayObject.D1 sdata = (ArrayObject.D1) Array.factory(DataType.STRING, new int[] {ncoords});
 
+    String[] dateStrings = new String[ncoords];
     for (int i = 0; i < ncoords; i++) {
       String coordValue = ii.next();
       CalendarDate cd = makeCalendarDateFromStringCoord(coordValue, org, errMessages);
-      sdata.set(i, coordValue);
+      dateStrings[i] = coordValue;
       result.add(cd);
     }
-    setCachedData(sdata, true);
+    setCachedData(ucar.array.Arrays.factory(DataType.STRING, new int[] {ncoords}, dateStrings));
     return result;
   }
 

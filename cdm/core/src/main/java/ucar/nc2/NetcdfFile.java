@@ -381,10 +381,11 @@ public class NetcdfFile implements FileCacheable, Closeable {
    * @return registered id of the file type
    * @see "https://www.unidata.ucar.edu/software/netcdf-java/formats/FileTypes.html"
    */
+  @Nullable
   public String getFileTypeId() {
     if (iosp != null)
       return iosp.getFileTypeId();
-    return "N/A";
+    return null;
   }
 
   /**
@@ -496,6 +497,8 @@ public class NetcdfFile implements FileCacheable, Closeable {
   // this is for reading non-member variables
   // section is null for full read
 
+  /** @deprecated use getStructureDataArrayIterator() */
+  @Deprecated
   protected StructureDataIterator getStructureIterator(Structure s, int bufferSize) throws IOException {
     return iosp.getStructureIterator(s, bufferSize);
   }
@@ -507,28 +510,26 @@ public class NetcdfFile implements FileCacheable, Closeable {
   /**
    * Do not call this directly, use Variable.read() !!
    * Ranges must be filled (no nulls)
+   * 
+   * @deprecated use readArrayData()
    */
+  @Deprecated
   protected Array readData(Variable v, Section ranges) throws IOException, InvalidRangeException {
-    long start = 0;
-    if (showRequest) {
-      log.info("Data request for variable: {} section {}...", v.getFullName(), ranges);
-      start = System.currentTimeMillis();
-    }
-
     if (iosp == null) {
       throw new IOException("iosp is null, perhaps file has been closed. Trying to read variable " + v.getFullName());
     }
-    Array result = iosp.readData(v, ranges);
-
-    if (showRequest) {
-      long took = System.currentTimeMillis() - start;
-      log.info(" ...took= {} msecs", took);
-    }
-    return result;
+    return iosp.readData(v, ranges);
   }
 
+  /**
+   * Do not call this directly, use Variable.readArray() !!
+   * Ranges must be filled (no nulls)
+   */
   @Nullable
   protected ucar.array.Array<?> readArrayData(Variable v, Section ranges) throws IOException, InvalidRangeException {
+    if (iosp == null) {
+      throw new IOException("iosp is null, perhaps file has been closed. Trying to read variable " + v.getFullName());
+    }
     return iosp.readArrayData(v, ranges);
   }
 
@@ -555,6 +556,15 @@ public class NetcdfFile implements FileCacheable, Closeable {
     else
       // allow iosp to optimize
       return iosp.readSection(cer);
+  }
+
+  public ucar.array.Array<?> readSectionArray(String variableSection) throws IOException, InvalidRangeException {
+    ParsedSectionSpec cer = ParsedSectionSpec.parseVariableSection(this, variableSection);
+    if (cer.getChild() == null) {
+      return cer.getVariable().readArray(cer.getSection());
+    }
+
+    throw new UnsupportedOperationException();
   }
 
   protected long readToOutputStream(Variable v, Section section, OutputStream out)
@@ -608,6 +618,10 @@ public class NetcdfFile implements FileCacheable, Closeable {
       didit = (Boolean) iosp.sendIospMessage(IOSP_MESSAGE_ADD_RECORD_STRUCTURE);
     }
     return (didit != null) && didit;
+  }
+
+  protected void setCachedData(Variable v, ucar.array.Array<?> cacheData) {
+    v.setCachedData(cacheData);
   }
 
 

@@ -7,20 +7,29 @@ package ucar.nc2;
 import java.io.IOException;
 import java.util.Iterator;
 import javax.annotation.concurrent.Immutable;
+import ucar.array.ArraysConvert;
 import ucar.ma2.*;
 import java.util.List;
 
 /**
- * Sequence is a one-dimensional Structure with indeterminate length.
+ * Sequence is a one-dimensional Structure with indeterminate length, including 0.
  * The only data access is through getStructureIterator().
  * However, read() will read in the entire data and return an in-memory ArraySequence.
  */
 @Immutable
 public class Sequence extends Structure implements Iterable<ucar.array.StructureData> {
 
+  /** @deprecated use iterator() */
+  @Deprecated
   public StructureDataIterator getStructureIterator(int bufferSize) throws java.io.IOException {
-    if (getCachedData() instanceof ArrayStructure) {
-      return ((ArrayStructure) getCachedData()).getStructureDataIterator();
+    if (cache.getData() != null) {
+      ucar.array.Array<?> array = cache.getData();
+      if (array instanceof ucar.array.StructureDataArray) {
+        ucar.ma2.Array ma2 = ArraysConvert.convertFromArray(array);
+        if (ma2 instanceof ArrayStructure) {
+          return ((ArrayStructure) ma2).getStructureDataIterator();
+        }
+      }
     }
     if (ncfile != null) {
       return ncfile.getStructureIterator(this, bufferSize);
@@ -30,6 +39,12 @@ public class Sequence extends Structure implements Iterable<ucar.array.Structure
 
   @Override
   public Iterator<ucar.array.StructureData> iterator() {
+    if (cache.getData() != null) {
+      ucar.array.Array<?> array = cache.getData();
+      if (array instanceof ucar.array.StructureDataArray) {
+        return (Iterator<ucar.array.StructureData>) array;
+      }
+    }
     try {
       return ncfile.getStructureDataArrayIterator(this, -1);
     } catch (IOException e) {
@@ -39,36 +54,42 @@ public class Sequence extends Structure implements Iterable<ucar.array.Structure
 
   /** Same as read() */
   @Override
+  @Deprecated
   public Array read(ucar.ma2.Section section) throws java.io.IOException {
     return read();
   }
 
   /** @throws UnsupportedOperationException always */
   @Override
+  @Deprecated
   public Array read(int[] origin, int[] shape) {
     throw new UnsupportedOperationException();
   }
 
   /** @throws UnsupportedOperationException always */
   @Override
+  @Deprecated
   public Array read(String sectionSpec) {
     throw new UnsupportedOperationException();
   }
 
   /** @throws UnsupportedOperationException always */
   @Override
+  @Deprecated
   public Array read(List<Range> ranges) {
     throw new UnsupportedOperationException();
   }
 
   /** @throws UnsupportedOperationException always */
   @Override
+  @Deprecated
   public StructureData readStructure(int index) {
     throw new UnsupportedOperationException();
   }
 
   /** @throws UnsupportedOperationException always */
   @Override
+  @Deprecated
   public ArrayStructure readStructure(int start, int count) {
     throw new UnsupportedOperationException();
   }

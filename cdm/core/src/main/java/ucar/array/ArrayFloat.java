@@ -15,7 +15,7 @@ import ucar.ma2.DataType;
 
 /** Concrete implementation of Array specialized for floats. */
 @Immutable
-public class ArrayFloat extends Array<Float> {
+public final class ArrayFloat extends Array<Float> {
   private final Storage<Float> storageF;
 
   // TODO whats the point if you cant change the storage?
@@ -28,19 +28,19 @@ public class ArrayFloat extends Array<Float> {
   /** Create an Array of type float and the given shape and storage. */
   public ArrayFloat(int[] shape, Storage<Float> storageF) {
     super(DataType.FLOAT, shape);
-    Preconditions.checkArgument(indexFn.length() <= storageF.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageF.length());
     this.storageF = storageF;
   }
 
   /** Create an Array of type float and the given indexFn and storage. */
   private ArrayFloat(IndexFn indexFn, Storage<Float> storageF) {
     super(DataType.FLOAT, indexFn);
-    Preconditions.checkArgument(indexFn.length() <= storageF.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageF.length());
     this.storageF = storageF;
   }
 
   @Override
-  public Iterator<Float> fastIterator() {
+  Iterator<Float> fastIterator() {
     return storageF.iterator();
   }
 
@@ -80,8 +80,8 @@ public class ArrayFloat extends Array<Float> {
 
   /** create new Array with given IndexFn and the same backing store */
   @Override
-  protected ArrayFloat createView(IndexFn indexFn) {
-    return new ArrayFloat(indexFn, storageF);
+  protected ArrayFloat createView(IndexFn view) {
+    return new ArrayFloat(view, storageF);
   }
 
   private class CanonicalIterator implements Iterator<Float> {
@@ -100,7 +100,7 @@ public class ArrayFloat extends Array<Float> {
   }
 
   @Immutable
-  static class StorageF implements Storage<Float> {
+  static final class StorageF implements Storage<Float> {
     private final float[] storage;
 
     StorageF(float[] storage) {
@@ -108,7 +108,7 @@ public class ArrayFloat extends Array<Float> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return storage.length;
     }
 
@@ -164,7 +164,7 @@ public class ArrayFloat extends Array<Float> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return totalLength;
     }
 
@@ -187,7 +187,7 @@ public class ArrayFloat extends Array<Float> {
 
       for (int index = startIndex; index < dataArrays.size(); index++) {
         Storage<Float> storage = dataArrays.get(index);
-        int have = (int) Math.min(storage.getLength() - startSrc, needed);
+        int have = (int) Math.min(storage.length() - startSrc, needed);
         storage.arraycopy(startSrc, dest, startDst, have);
         needed -= have;
         startDst += have;

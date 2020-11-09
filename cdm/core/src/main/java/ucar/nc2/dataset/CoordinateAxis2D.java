@@ -4,7 +4,12 @@
  */
 package ucar.nc2.dataset;
 
-import ucar.ma2.*;
+import ucar.ma2.Array;
+import ucar.ma2.ArrayDouble;
+import ucar.ma2.DataType;
+import ucar.ma2.InvalidRangeException;
+import ucar.ma2.MAMath;
+import ucar.ma2.Range;
 import ucar.nc2.Group;
 import ucar.nc2.constants.AxisType;
 import ucar.nc2.constants.CF;
@@ -17,7 +22,10 @@ import java.util.List;
 /**
  * A 2-dimensional numeric Coordinate Axis. Must be invertible meaning, roughly, that
  * if you draw lines connecting the points, none would cross.
+ * 
+ * @deprecated use GridAxis2D
  */
+@Deprecated
 public class CoordinateAxis2D extends CoordinateAxis {
   private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CoordinateAxis2D.class);
 

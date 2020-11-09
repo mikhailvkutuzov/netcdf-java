@@ -11,7 +11,7 @@ import ucar.ma2.DataType;
 
 /** Concrete implementation of Array specialized for Char. */
 @Immutable
-public class ArrayChar extends Array<Character> {
+public final class ArrayChar extends Array<Character> {
   private final Storage<Character> storage;
 
   /** Create an empty Array of type Char and the given shape. */
@@ -23,19 +23,19 @@ public class ArrayChar extends Array<Character> {
   /** Create an Array of type Char and the given shape and storage. */
   public ArrayChar(int[] shape, Storage<Character> storage) {
     super(DataType.CHAR, shape);
-    Preconditions.checkArgument(indexFn.length() <= storage.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storage.length());
     this.storage = storage;
   }
 
   /** Create an Array of type Char and the given indexFn and storage. */
   private ArrayChar(IndexFn indexFn, Storage<Character> storageD) {
     super(DataType.CHAR, indexFn);
-    Preconditions.checkArgument(indexFn.length() <= storageD.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageD.length());
     this.storage = storageD;
   }
 
   @Override
-  public Iterator<Character> fastIterator() {
+  Iterator<Character> fastIterator() {
     return storage.iterator();
   }
 
@@ -68,6 +68,65 @@ public class ArrayChar extends Array<Character> {
     }
   }
 
+  /**
+   * Create a String out of this rank zero or one ArrayChar.
+   * If there is a null (zero) value in the ArrayChar array, the String will end there.
+   * The null is not returned as part of the String.
+   *
+   * @throws Exception if rank > 1
+   */
+  public String makeStringFromChar() {
+    Preconditions.checkArgument(getRank() < 2);
+    int count = 0;
+    for (char c : this) {
+      if (c == 0) {
+        break;
+      }
+      count++;
+    }
+    char[] carr = new char[count];
+    int idx = 0;
+    for (char c : this) {
+      if (c == 0) {
+        break;
+      }
+      carr[idx++] = c;
+    }
+    return String.valueOf(carr);
+  }
+
+  /**
+   * Create an Array of Strings out of this ArrayChar of any rank.
+   * If there is a null (zero) value in the ArrayChar array, the String will end there.
+   * The null is not returned as part of the String.
+   *
+   * @return Array of Strings of rank - 1.
+   */
+  public Array<String> makeStringsFromChar() {
+    if (getRank() < 2) {
+      return Arrays.factory(DataType.STRING, new int[] {1}, new String[] {makeStringFromChar()});
+    }
+    int innerLength = this.indexFn.getShape(this.rank - 1);
+    int outerLength = (int) this.length() / innerLength;
+    int[] outerShape = new int[this.rank - 1];
+    System.arraycopy(this.getShape(), 0, outerShape, 0, this.rank - 1);
+
+    String[] result = new String[outerLength];
+    char[] carr = new char[innerLength];
+    int sidx = 0;
+    int cidx = 0;
+    int idx = 0;
+    for (char c : this) {
+      carr[cidx++] = c;
+      idx++;
+      if (idx % innerLength == 0) {
+        result[sidx++] = String.valueOf(carr);
+        cidx = 0;
+      }
+    }
+    return Arrays.factory(DataType.STRING, outerShape, result);
+  }
+
   @Override
   Storage<Character> storage() {
     return storage;
@@ -75,8 +134,8 @@ public class ArrayChar extends Array<Character> {
 
   /** create new Array with given IndexFn and the same backing store */
   @Override
-  protected ArrayChar createView(IndexFn indexFn) {
-    return new ArrayChar(indexFn, this.storage);
+  protected ArrayChar createView(IndexFn view) {
+    return new ArrayChar(view, this.storage);
   }
 
   // used when the data is not in canonical order
@@ -94,9 +153,9 @@ public class ArrayChar extends Array<Character> {
     }
   }
 
-  // standard storage using short[] primitive array
+  // standard storage using char[] primitive array
   @Immutable
-  static class StorageS implements Storage<Character> {
+  static final class StorageS implements Storage<Character> {
     private final char[] storage;
 
     StorageS(char[] storage) {
@@ -104,7 +163,7 @@ public class ArrayChar extends Array<Character> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return storage.length;
     }
 

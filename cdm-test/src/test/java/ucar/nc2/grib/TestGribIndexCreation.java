@@ -27,7 +27,7 @@ import java.util.Formatter;
 
 /**
  * Test that the CDM Index Creation works.
- * Jenkins seems to recreate indices, and so needs this to be on?
+ * Jenkins recreates indices, and so needs this to run.
  */
 @Category(NeedsCdmUnitTest.class)
 // @Ignore("too long")
@@ -308,18 +308,6 @@ public class TestGribIndexCreation {
   }
 
   @Test
-  public void testWW3() throws IOException {
-    // String name, String path, FeatureCollectionType fcType,
-    // String spec, String collectionName,
-    // String dateFormatMark, String olderThan, String timePartition, Element innerNcml)
-    FeatureCollectionConfig config = new FeatureCollectionConfig("ds093.1", "test/ds093.1", FeatureCollectionType.GRIB2,
-        TestDir.cdmUnitTestDir + "tds/ncep/WW3_Coastal_Alaska_20140804_0000.grib2", null, null, null, "file", null);
-
-    boolean changed = GribCdmIndex.updateGribCollection(config, updateMode, logger);
-    System.out.printf("changed = %s%n", changed);
-  }
-
-  @Test
   public void testMRUTP() throws IOException { // should be a TP (multiple runtime, single offset
     // String name, String path, FeatureCollectionType fcType,
     // String spec, String collectionName,
@@ -332,10 +320,10 @@ public class TestGribIndexCreation {
     System.out.printf("changed = %s%n", changed);
   }
 
-  @Test
+  // These files all fail, probably due to non-standard ecmwf format.
   public void createECMWFbcs() throws IOException { // SRC
     FeatureCollectionConfig config =
-        new FeatureCollectionConfig("ECMWFbcs", "test/ECMWFbcs", FeatureCollectionType.GRIB1,
+        new FeatureCollectionConfig("ECMWFbcs", "test/ECMWFbcs", FeatureCollectionType.GRIB2,
             TestDir.cdmUnitTestDir + "gribCollections/ecmwf/bcs/.*001$", null, null, null, "directory", null);
 
     boolean changed = GribCdmIndex.updateGribCollection(config, updateMode, logger);

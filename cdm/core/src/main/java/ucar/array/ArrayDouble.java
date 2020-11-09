@@ -15,7 +15,7 @@ import ucar.ma2.DataType;
 
 /** Concrete implementation of Array specialized for doubles. */
 @Immutable
-public class ArrayDouble extends ucar.array.Array<Double> {
+public final class ArrayDouble extends ucar.array.Array<Double> {
   private final Storage<Double> storageD;
 
   /** Create an empty Array of type double and the given shape. */
@@ -27,19 +27,19 @@ public class ArrayDouble extends ucar.array.Array<Double> {
   /** Create an Array of type double and the given shape and storage. */
   public ArrayDouble(int[] shape, Storage<Double> storageD) {
     super(DataType.DOUBLE, shape);
-    Preconditions.checkArgument(indexFn.length() <= storageD.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageD.length());
     this.storageD = storageD;
   }
 
   /** Create an Array of type double and the given indexFn and storage. */
   private ArrayDouble(IndexFn indexFn, Storage<Double> storageD) {
     super(DataType.DOUBLE, indexFn);
-    Preconditions.checkArgument(indexFn.length() <= storageD.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageD.length());
     this.storageD = storageD;
   }
 
   @Override
-  public Iterator<Double> fastIterator() {
+  Iterator<Double> fastIterator() {
     return storageD.iterator();
   }
 
@@ -79,8 +79,8 @@ public class ArrayDouble extends ucar.array.Array<Double> {
 
   /** create new Array with given IndexFn and the same backing store */
   @Override
-  protected ArrayDouble createView(IndexFn indexFn) {
-    return new ArrayDouble(indexFn, storageD);
+  protected ArrayDouble createView(IndexFn view) {
+    return new ArrayDouble(view, storageD);
   }
 
   // used when the data is not in canonical order
@@ -100,7 +100,7 @@ public class ArrayDouble extends ucar.array.Array<Double> {
 
   // standard storage using double[] primitive array
   @Immutable
-  static class StorageD implements Storage<Double> {
+  static final class StorageD implements Storage<Double> {
     private final double[] storage;
 
     StorageD(double[] storage) {
@@ -108,7 +108,7 @@ public class ArrayDouble extends ucar.array.Array<Double> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return storage.length;
     }
 
@@ -142,6 +142,7 @@ public class ArrayDouble extends ucar.array.Array<Double> {
     }
   }
 
+  /////////////////////////////////////////////////////////////////////////
   // experimental storage using List of Storage<Double>
   @Immutable
   static class StorageDM implements Storage<Double> {
@@ -155,7 +156,7 @@ public class ArrayDouble extends ucar.array.Array<Double> {
       edge.add(0L);
       long total = 0L;
       for (Array<?> dataArray : dataArrays) {
-        builder.add(((Array<Double>) dataArray).storage());
+        builder.add((Storage<Double>) dataArray.storage());
         total += dataArray.length();
         edge.add(total);
       }
@@ -165,7 +166,7 @@ public class ArrayDouble extends ucar.array.Array<Double> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return totalLength;
     }
 
@@ -188,7 +189,7 @@ public class ArrayDouble extends ucar.array.Array<Double> {
 
       for (int index = startIndex; index < dataArrays.size(); index++) {
         Storage<Double> storage = dataArrays.get(index);
-        int have = (int) Math.min(storage.getLength() - startSrc, needed);
+        int have = (int) Math.min(storage.length() - startSrc, needed);
         storage.arraycopy(startSrc, dest, startDst, have);
         needed -= have;
         startDst += have;

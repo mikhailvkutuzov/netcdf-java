@@ -10,12 +10,12 @@ import javax.annotation.concurrent.Immutable;
 import ucar.ma2.DataType;
 
 /**
- * Array of variable length primitive arrays of T, eg double[length][];
+ * Array of variable length primitive arrays of T, eg double[length][].
  * Cast resulting Array<T>, eg to Array<Double>.
  * Find out type from getPrimitiveArrayType() (not getDataType(), which is VLEN).
  * This is mutable, to assist users in constructing. See set(index, value).
  */
-public class ArrayVlen<T> extends Array<Array<T>> {
+public final class ArrayVlen<T> extends Array<Array<T>> {
 
   /**
    * Creates a Vlen of type dataType, and the given shape.
@@ -114,32 +114,33 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
   /////////////////////////////////////////////////////////////////////////
   private final StorageMutable<Array<T>> storage;
-  private final DataType primitiveArrayType;
 
-  /** Create an empty Vlen of type primitiveArrayType and the given shape. */
-  private ArrayVlen(DataType primitiveArrayType, int[] shape) {
-    super(DataType.VLEN, shape);
-    this.storage = createStorage(primitiveArrayType, (int) Arrays.computeSize(shape), null);
-    this.primitiveArrayType = primitiveArrayType;
+  /** Create an empty Vlen of type dataType and the given shape. */
+  private ArrayVlen(DataType dataType, int[] shape) {
+    super(dataType, shape);
+    this.storage = createStorage(dataType, (int) Arrays.computeSize(shape), null);
   }
 
-  /** Create an empty Vlen of type primitiveArrayType and data array T[][]. */
-  private ArrayVlen(DataType primitiveArrayType, int[] shape, Object dataArray) {
-    super(DataType.VLEN, shape);
-    this.storage = createStorage(primitiveArrayType, (int) Arrays.computeSize(shape), dataArray);
-    this.primitiveArrayType = primitiveArrayType;
+  /** Create an empty Vlen of type dataType and data array T[][]. */
+  private ArrayVlen(DataType dataType, int[] shape, Object dataArray) {
+    super(dataType, shape);
+    this.storage = createStorage(dataType, (int) Arrays.computeSize(shape), dataArray);
   }
 
   /** Create an Array of type Array<T> and the given indexFn and storage. */
-  private ArrayVlen(DataType primitiveArrayType, IndexFn indexFn, StorageMutable<Array<T>> storage) {
-    super(DataType.VLEN, indexFn);
-    Preconditions.checkArgument(indexFn.length() <= storage.getLength());
+  private ArrayVlen(DataType dataType, IndexFn indexFn, StorageMutable<Array<T>> storage) {
+    super(dataType, indexFn);
+    Preconditions.checkArgument(indexFn.length() <= storage.length());
     this.storage = storage;
-    this.primitiveArrayType = primitiveArrayType;
   }
 
   @Override
-  public Iterator<Array<T>> fastIterator() {
+  public boolean isVlen() {
+    return true;
+  }
+
+  @Override
+  Iterator<Array<T>> fastIterator() {
     return storage.iterator();
   }
 
@@ -156,11 +157,6 @@ public class ArrayVlen<T> extends Array<Array<T>> {
   @Override
   public Array<T> get(Index index) {
     return get(index.getCurrentIndex());
-  }
-
-  /** The resulting object will be a primitive array of this type, eg double[], or any length. */
-  public DataType getPrimitiveArrayType() {
-    return this.primitiveArrayType;
   }
 
   /**
@@ -194,8 +190,8 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
   /** create new Array with given IndexFn and the same backing store */
   @Override
-  protected ArrayVlen<T> createView(IndexFn indexFn) {
-    return new ArrayVlen<>(this.dataType, indexFn, this.storage);
+  protected ArrayVlen<T> createView(IndexFn view) {
+    return new ArrayVlen<>(this.dataType, view, this.storage);
   }
 
   // used when the data is not in canonical order
@@ -215,7 +211,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
   // standard storage using ragged array byte[fixed][]
   @Immutable
-  static class StorageVByte implements StorageMutable<Array<Byte>> {
+  static final class StorageVByte implements StorageMutable<Array<Byte>> {
     private final DataType primitiveArrayType;
     private final byte[][] primitiveArray;
 
@@ -225,7 +221,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return primitiveArray.length;
     }
 
@@ -247,6 +243,9 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
     @Override
     public void set(int index, Object value) {
+      if (value instanceof ArrayByte) {
+        value = Arrays.copyPrimitiveArray((ArrayByte) value);
+      }
       primitiveArray[index] = (byte[]) value;
     }
 
@@ -276,7 +275,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return primitiveArray.length;
     }
 
@@ -298,6 +297,9 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
     @Override
     public void set(int index, Object value) {
+      if (value instanceof ArrayChar) {
+        value = Arrays.copyPrimitiveArray((ArrayChar) value);
+      }
       primitiveArray[index] = (char[]) value;
     }
 
@@ -327,7 +329,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return primitiveArray.length;
     }
 
@@ -349,6 +351,9 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
     @Override
     public void set(int index, Object value) {
+      if (value instanceof ArrayDouble) {
+        value = Arrays.copyPrimitiveArray((ArrayDouble) value);
+      }
       primitiveArray[index] = (double[]) value;
     }
 
@@ -378,7 +383,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return primitiveArray.length;
     }
 
@@ -400,6 +405,9 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
     @Override
     public void set(int index, Object value) {
+      if (value instanceof ArrayFloat) {
+        value = Arrays.copyPrimitiveArray((ArrayFloat) value);
+      }
       primitiveArray[index] = (float[]) value;
     }
 
@@ -431,7 +439,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return primitiveArray.length;
     }
 
@@ -453,6 +461,9 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
     @Override
     public void set(int index, Object value) {
+      if (value instanceof ArrayInteger) {
+        value = Arrays.copyPrimitiveArray((ArrayInteger) value);
+      }
       primitiveArray[index] = (int[]) value;
     }
 
@@ -484,7 +495,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return primitiveArray.length;
     }
 
@@ -506,6 +517,9 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
     @Override
     public void set(int index, Object value) {
+      if (value instanceof ArrayLong) {
+        value = Arrays.copyPrimitiveArray((ArrayLong) value);
+      }
       primitiveArray[index] = (long[]) value;
     }
 
@@ -537,7 +551,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return primitiveArray.length;
     }
 
@@ -559,6 +573,9 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
     @Override
     public void set(int index, Object value) {
+      if (value instanceof ArrayShort) {
+        value = Arrays.copyPrimitiveArray((ArrayShort) value);
+      }
       primitiveArray[index] = (short[]) value;
     }
 
@@ -588,7 +605,7 @@ public class ArrayVlen<T> extends Array<Array<T>> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return primitiveArray.length;
     }
 
@@ -610,6 +627,9 @@ public class ArrayVlen<T> extends Array<Array<T>> {
 
     @Override
     public void set(int index, Object value) {
+      if (value instanceof ArrayString) {
+        value = Arrays.copyPrimitiveArray((ArrayString) value);
+      }
       primitiveArray[index] = (String[]) value;
     }
 

@@ -5,13 +5,15 @@
 package ucar.array;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import javax.annotation.concurrent.Immutable;
 import ucar.ma2.DataType;
 
 /** Concrete implementation of Array specialized for Byte. */
 @Immutable
-public class ArrayByte extends Array<Byte> {
+public final class ArrayByte extends Array<Byte> {
   private final Storage<Byte> storage;
 
   /** Create an empty Array of type Byte and the given shape. */
@@ -23,19 +25,19 @@ public class ArrayByte extends Array<Byte> {
   /** Create an Array of type Byte and the given shape and storage. */
   public ArrayByte(DataType dtype, int[] shape, Storage<Byte> storage) {
     super(dtype, shape);
-    Preconditions.checkArgument(indexFn.length() <= storage.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storage.length());
     this.storage = storage;
   }
 
   /** Create an Array of type Byte and the given indexFn and storage. */
   private ArrayByte(DataType dtype, IndexFn indexFn, Storage<Byte> storageD) {
     super(dtype, indexFn);
-    Preconditions.checkArgument(indexFn.length() <= storageD.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageD.length());
     this.storage = storageD;
   }
 
   @Override
-  public Iterator<Byte> fastIterator() {
+  Iterator<Byte> fastIterator() {
     return storage.iterator();
   }
 
@@ -68,6 +70,32 @@ public class ArrayByte extends Array<Byte> {
     }
   }
 
+  /** Convert the Array into a ByteString. */
+  public ByteString getByteString() {
+    if (indexFn.isCanonicalOrder()) {
+      ByteString.copyFrom(((StorageS) storage).storage);
+    }
+
+    byte[] raw = new byte[(int) length()];
+    int idx = 0;
+    for (byte bval : this) {
+      raw[idx++] = bval;
+    }
+    return ByteString.copyFrom(raw);
+  }
+
+  /** Convert the Array into a ByteBuffer. */
+  public ByteBuffer getByteBuffer() {
+    if (indexFn.isCanonicalOrder()) {
+      return ByteBuffer.wrap(((StorageS) storage).storage);
+    }
+    ByteBuffer result = ByteBuffer.allocate((int) this.length());
+    for (byte bval : this) {
+      result.put(bval);
+    }
+    return result;
+  }
+
   @Override
   Storage<Byte> storage() {
     return storage;
@@ -75,8 +103,8 @@ public class ArrayByte extends Array<Byte> {
 
   /** create new Array with given IndexFn and the same backing store */
   @Override
-  protected ArrayByte createView(IndexFn indexFn) {
-    return new ArrayByte(this.dataType, indexFn, this.storage);
+  protected ArrayByte createView(IndexFn view) {
+    return new ArrayByte(this.dataType, view, this.storage);
   }
 
   // used when the data is not in canonical order
@@ -96,7 +124,7 @@ public class ArrayByte extends Array<Byte> {
 
   // standard storage using byte[] primitive array
   @Immutable
-  static class StorageS implements Storage<Byte> {
+  static final class StorageS implements Storage<Byte> {
     private final byte[] storage;
 
     StorageS(byte[] storage) {
@@ -104,7 +132,7 @@ public class ArrayByte extends Array<Byte> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return storage.length;
     }
 

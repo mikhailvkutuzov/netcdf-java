@@ -11,7 +11,7 @@ import ucar.ma2.DataType;
 
 /** Concrete implementation of Array specialized for Long. */
 @Immutable
-public class ArrayLong extends Array<Long> {
+public final class ArrayLong extends Array<Long> {
   private final Storage<Long> storage;
 
   /** Create an empty Array of type Long and the given shape. */
@@ -23,19 +23,19 @@ public class ArrayLong extends Array<Long> {
   /** Create an Array of type Long and the given shape and storage. */
   public ArrayLong(DataType dtype, int[] shape, Storage<Long> storage) {
     super(dtype, shape);
-    Preconditions.checkArgument(indexFn.length() <= storage.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storage.length());
     this.storage = storage;
   }
 
   /** Create an Array of type Long and the given indexFn and storage. */
   private ArrayLong(DataType dtype, IndexFn indexFn, Storage<Long> storageD) {
     super(dtype, indexFn);
-    Preconditions.checkArgument(indexFn.length() <= storageD.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageD.length());
     this.storage = storageD;
   }
 
   @Override
-  public Iterator<Long> fastIterator() {
+  Iterator<Long> fastIterator() {
     return storage.iterator();
   }
 
@@ -75,8 +75,8 @@ public class ArrayLong extends Array<Long> {
 
   /** create new Array with given IndexFn and the same backing store */
   @Override
-  protected ArrayLong createView(IndexFn indexFn) {
-    return new ArrayLong(this.dataType, indexFn, this.storage);
+  protected ArrayLong createView(IndexFn view) {
+    return new ArrayLong(this.dataType, view, this.storage);
   }
 
   // used when the data is not in canonical order
@@ -96,7 +96,7 @@ public class ArrayLong extends Array<Long> {
 
   // standard storage using long[] primitive array
   @Immutable
-  static class StorageS implements Storage<Long> {
+  static final class StorageS implements Storage<Long> {
     private final long[] storage;
 
     StorageS(long[] storage) {
@@ -104,7 +104,7 @@ public class ArrayLong extends Array<Long> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return storage.length;
     }
 

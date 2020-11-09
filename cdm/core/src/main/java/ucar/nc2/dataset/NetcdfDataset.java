@@ -9,6 +9,7 @@ import com.google.common.collect.ImmutableSet;
 import javax.annotation.Nullable;
 import ucar.nc2.*;
 import ucar.nc2.constants.AxisType;
+import ucar.nc2.constants._Coordinate;
 import ucar.nc2.internal.dataset.CoordinatesHelper;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -77,7 +78,7 @@ import java.util.*;
 
 public class NetcdfDataset extends ucar.nc2.NetcdfFile {
   private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NetcdfDataset.class);
-  public static final String AGGREGATION = "Aggregaation";
+  public static final String AGGREGATION = "Aggregation";
 
   /**
    * Possible enhancements for a NetcdfDataset
@@ -268,7 +269,7 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
   }
 
   /**
-   * Retrieve the CoordinateAxis with the specified type.
+   * Retrieve the CoordinateAxis with the specified fullName.
    *
    * @param fullName full escaped name of the coordinate axis
    * @return the CoordinateAxis, or null if not found
@@ -313,6 +314,31 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
         return v;
     }
     return null;
+  }
+
+  /** Return true if axis is 1D with a unique dimension. */
+  public boolean isIndependentCoordinate(CoordinateAxis axis) {
+    if (axis.isCoordinateVariable()) {
+      return true;
+    }
+    if (axis.getRank() != 1) {
+      return false;
+    }
+    if (axis.attributes().hasAttribute(_Coordinate.AliasForDimension)) {
+      return true;
+    }
+    Dimension dim = axis.getDimension(0);
+    for (CoordinateAxis other : getCoordinateAxes()) {
+      if (other == axis) {
+        continue;
+      }
+      for (Dimension odim : other.getDimensions()) {
+        if (dim.equals(odim)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   @Override
@@ -485,12 +511,22 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
   }
 
   @Override
+  @Nullable
   public String getFileTypeId() {
-    if (orgFile != null)
-      return orgFile.getFileTypeId();
-    if (agg != null)
-      return agg.getFileTypeId();
-    return "N/A";
+    String inner = null;
+    if (orgFile != null) {
+      inner = orgFile.getFileTypeId();
+    }
+    if (inner == null && agg != null) {
+      inner = agg.getFileTypeId();
+    }
+    if (this.fileTypeId == null) {
+      return inner;
+    }
+    if (inner == null) {
+      return this.fileTypeId;
+    }
+    return (inner.startsWith(this.fileTypeId)) ? inner : this.fileTypeId + "/" + inner;
   }
 
   @Override
@@ -522,17 +558,19 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
 
   ////////////////////////////////////////////////////////////////////////////////////////////
   // TODO make these final and immutable in 6.
-  private NetcdfFile orgFile;
+  private NetcdfFile orgFile; // can be null in Ncml
   private List<CoordinateAxis> coordAxes = new ArrayList<>();
   private List<CoordinateSystem> coordSys = new ArrayList<>();
   private List<CoordinateTransform> coordTransforms = new ArrayList<>();
   private String convUsed;
   private Set<Enhance> enhanceMode = EnumSet.noneOf(Enhance.class); // enhancement mode for this specific dataset
   private ucar.nc2.internal.ncml.Aggregation agg;
+  private String fileTypeId;
 
   private NetcdfDataset(Builder<?> builder) {
     super(builder);
     this.orgFile = builder.orgFile;
+    this.fileTypeId = builder.fileTypeId;
     this.convUsed = builder.convUsed;
     this.enhanceMode = builder.getEnhanceMode();
     this.agg = builder.agg;
@@ -572,7 +610,7 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
     this.coordTransforms.forEach(trans -> b.coords.addCoordinateTransform(trans.toBuilder()));
 
     b.setOrgFile(this.orgFile).setConventionUsed(this.convUsed).setEnhanceMode(this.enhanceMode)
-        .setAggregation(this.agg);
+        .setAggregation(this.agg).setFileTypeId(this.fileTypeId);
 
     return (Builder<?>) super.addLocalFieldsToBuilder(b);
   }
@@ -606,6 +644,7 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
     private String convUsed;
     private Set<Enhance> enhanceMode = EnumSet.noneOf(Enhance.class); // LOOK should be default ??
     public ucar.nc2.internal.ncml.Aggregation agg; // If its an aggregation
+    private String fileTypeId;
 
     private boolean built;
 
@@ -625,6 +664,11 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
 
     public T setOrgFile(NetcdfFile orgFile) {
       this.orgFile = orgFile;
+      return self();
+    }
+
+    public T setFileTypeId(String fileTypeId) {
+      this.fileTypeId = fileTypeId;
       return self();
     }
 
@@ -691,13 +735,13 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
       g.addEnumTypedefs(from.getEnumTypedefs()); // copy
 
       for (Dimension d : from.getDimensions()) {
-        g.addDimension(d.toBuilder().build()); // can use without copy after ver 6.
+        g.addDimension(d);
       }
 
       g.addAttributes(from.attributes()); // copy
 
       for (Variable v : from.getVariables()) {
-        g.addVariable(convertVariable(v)); // convert
+        g.addVariable(convertVariable(g, v)); // convert
       }
 
       for (Group nested : from.getGroups()) {
@@ -707,7 +751,7 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
       }
     }
 
-    private Variable.Builder<?> convertVariable(Variable v) {
+    private Variable.Builder<?> convertVariable(Group.Builder g, Variable v) {
       Variable.Builder<?> newVar;
       if (v instanceof Sequence) {
         newVar = SequenceDS.builder().copyFrom((Sequence) v);
@@ -716,6 +760,7 @@ public class NetcdfDataset extends ucar.nc2.NetcdfFile {
       } else {
         newVar = VariableDS.builder().copyFrom(v);
       }
+      newVar.setParentGroupBuilder(g);
       return newVar;
     }
 

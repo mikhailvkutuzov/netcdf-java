@@ -147,7 +147,7 @@ public class DodsNetcdfFile extends ucar.nc2.NetcdfFile {
   // called from ucar.nc2.Variable
 
   /**
-   * Make a single call to the DODS Server to read and cache all the named v\Variable's
+   * Make a single call to the DODS Server to read and cache all the named Variables
    * in one client/server roundtrip.
    *
    * @param preloadVariables list of type Variable
@@ -282,7 +282,7 @@ public class DodsNetcdfFile extends ucar.nc2.NetcdfFile {
           }
 
           if (var.isCaching()) {
-            var.setCachedData(data);
+            this.setCachedData(var, ucar.array.ArraysConvert.convertToArray(data));
             if (DodsNetcdfFiles.debugCached) {
               System.out.println(" cache for <" + var.getFullName() + "> length =" + data.getSize());
             }
@@ -327,9 +327,28 @@ public class DodsNetcdfFile extends ucar.nc2.NetcdfFile {
 
       DataDDS dataDDS = readDataDDSfromServer(buff.toString());
       DodsV root = DodsV.parseDataDDS(dataDDS);
-      DodsV want = root.children.get(0); // can only be one
-      dataArray = convertD2N.convertTopVariable(v, section.getRanges(), want);
+      DodsV want = null;
+      // Find the child node matching the requested variable
+      for (int i = 0; i < root.children.size(); i++) {
+        DodsV element = root.children.get(i);
+        if (element.getFullName().equals(v.getFullName())) {
+          want = element;
+          break;
+        }
+      }
 
+      if (want == null) {
+        throw new ParseException("Variable " + v.getFullName() + " not found in DDS.");
+      }
+
+      dataArray = convertD2N.convertTopVariable(v, section.getRanges(), want);
+      // if reading from a server response, we have exactly the section of data
+      // requested. If reading from a file, we need to make sure we are only returning
+      // the section. What's not-so-good is that we've already read the entire array into
+      // memory when parsing the binary file.
+      if (getLocation().startsWith("file:")) {
+        dataArray = dataArray.section(section.getRanges());
+      }
     } catch (DAP2Exception ex) {
       ex.printStackTrace();
       throw new IOException(ex.getMessage() + "; " + v.getShortName() + " -- " + section);

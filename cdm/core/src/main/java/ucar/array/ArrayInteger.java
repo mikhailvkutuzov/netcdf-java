@@ -11,7 +11,7 @@ import ucar.ma2.DataType;
 
 /** Concrete implementation of Array specialized for Integer. */
 @Immutable
-public class ArrayInteger extends Array<Integer> {
+public final class ArrayInteger extends Array<Integer> {
   private final Storage<Integer> storage;
 
   /** Create an empty Array of type Integer and the given shape. */
@@ -23,19 +23,19 @@ public class ArrayInteger extends Array<Integer> {
   /** Create an Array of type Integer and the given shape and storage. */
   public ArrayInteger(DataType dtype, int[] shape, Storage<Integer> storage) {
     super(dtype, shape);
-    Preconditions.checkArgument(indexFn.length() <= storage.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storage.length());
     this.storage = storage;
   }
 
   /** Create an Array of type Integer and the given indexFn and storage. */
   private ArrayInteger(DataType dtype, IndexFn indexFn, Storage<Integer> storageD) {
     super(dtype, indexFn);
-    Preconditions.checkArgument(indexFn.length() <= storageD.getLength());
+    Preconditions.checkArgument(indexFn.length() <= storageD.length());
     this.storage = storageD;
   }
 
   @Override
-  public Iterator<Integer> fastIterator() {
+  Iterator<Integer> fastIterator() {
     return storage.iterator();
   }
 
@@ -75,8 +75,8 @@ public class ArrayInteger extends Array<Integer> {
 
   /** create new Array with given IndexFn and the same backing store */
   @Override
-  protected ArrayInteger createView(IndexFn indexFn) {
-    return new ArrayInteger(this.dataType, indexFn, this.storage);
+  protected ArrayInteger createView(IndexFn view) {
+    return new ArrayInteger(this.dataType, view, this.storage);
   }
 
   // used when the data is not in canonical order
@@ -96,7 +96,7 @@ public class ArrayInteger extends Array<Integer> {
 
   // standard storage using int[] primitive array
   @Immutable
-  static class StorageS implements Storage<Integer> {
+  static final class StorageS implements Storage<Integer> {
     private final int[] storage;
 
     StorageS(int[] storage) {
@@ -104,7 +104,7 @@ public class ArrayInteger extends Array<Integer> {
     }
 
     @Override
-    public long getLength() {
+    public long length() {
       return storage.length;
     }
 

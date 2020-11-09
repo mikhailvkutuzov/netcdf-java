@@ -11,26 +11,25 @@ import javax.annotation.concurrent.Immutable;
 import ucar.ma2.DataType;
 
 /**
- * Array<StructureData>.
- * Specialization is in Storage<StructureData></StructureData>
- * Not really immutable, since Storage<StructureData> may not be, but thats hidden to the consumer.
+ * Concrete implementation of Array specialized for StructureData.
+ * Not really immutable, since Storage\<StructureData\> may not be, but thats hidden to the consumer.
  */
 @Immutable
-public class StructureDataArray extends Array<StructureData> {
+public final class StructureDataArray extends Array<StructureData> {
   private final Storage<StructureData> storage;
   private final StructureMembers members;
 
-  /** Create an Array of type StructureData and the given shape and storage. */
+  /** Create an Array of type StructureData and the given shape and storage. Ok if parray is bigger than shape. */
   public StructureDataArray(StructureMembers members, int[] shape, StructureData[] parray) {
     super(DataType.STRUCTURE, shape);
     this.members = members;
-    storage = new StorageSD(parray);
+    storage = new StorageSD(parray, (int) indexFn.length());
   }
 
   /** Create an Array of type StructureData and the given shape and storage. */
   public StructureDataArray(StructureMembers members, int[] shape, Storage<StructureData> storage) {
     super(DataType.STRUCTURE, shape);
-    Preconditions.checkArgument(indexFn.length() == storage.getLength());
+    Preconditions.checkArgument(indexFn.length() == storage.length());
     this.members = members;
     this.storage = storage;
   }
@@ -53,22 +52,17 @@ public class StructureDataArray extends Array<StructureData> {
   }
 
   @Override
-  public long getSizeBytes() {
-    return indexFn.length() * members.getStorageSizeBytes();
-  }
-
-  @Override
   void arraycopy(int srcPos, Object dest, int destPos, long length) {
     // TODO
   }
 
   @Override
-  Array<StructureData> createView(IndexFn index) {
-    return new StructureDataArray(this.members, indexFn, this.storage);
+  Array<StructureData> createView(IndexFn view) {
+    return new StructureDataArray(this.members, view, this.storage);
   }
 
   @Override
-  public Iterator<StructureData> fastIterator() {
+  Iterator<StructureData> fastIterator() {
     return storage.iterator();
   }
 
@@ -88,7 +82,7 @@ public class StructureDataArray extends Array<StructureData> {
     return get(index.getCurrentIndex());
   }
 
-  /** Get the size of each StructureData object in bytes. */
+  /** Get the size of one StructureData in bytes. */
   public int getStructureSize() {
     return members.getStorageSizeBytes();
   }
@@ -113,16 +107,19 @@ public class StructureDataArray extends Array<StructureData> {
     }
   }
 
-  static class StorageSD implements StorageMutable<StructureData> { // LOOK mutable ??
+  static final class StorageSD implements StorageMutable<StructureData> { // LOOK mutable ??
     final StructureData[] parray;
+    final int length;
 
-    StorageSD(StructureData[] parray) {
+    StorageSD(StructureData[] parray, int length) {
+      Preconditions.checkArgument(parray.length >= length);
       this.parray = parray;
+      this.length = length;
     }
 
     @Override
-    public long getLength() {
-      return parray.length;
+    public long length() {
+      return length;
     }
 
     @Override
@@ -150,7 +147,7 @@ public class StructureDataArray extends Array<StructureData> {
 
       @Override
       public final boolean hasNext() {
-        return count < parray.length;
+        return count < length;
       }
 
       @Override

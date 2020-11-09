@@ -4,6 +4,7 @@
  */
 package ucar.array;
 
+import com.google.common.base.Objects;
 import java.util.Iterator;
 import javax.annotation.concurrent.Immutable;
 import ucar.ma2.DataType;
@@ -13,10 +14,11 @@ import ucar.ma2.Section;
 @Immutable
 public abstract class Array<T> implements Iterable<T> {
 
+  /** Iterates in canonical order over all the elements of the Array. */
   @Override
   public abstract Iterator<T> iterator();
 
-  public abstract Iterator<T> fastIterator();
+  abstract Iterator<T> fastIterator();
 
   /**
    * Get the element indicated by the list of multidimensional indices.
@@ -28,18 +30,28 @@ public abstract class Array<T> implements Iterable<T> {
   /**
    * Get the element indicated by Index.
    * 
-   * @param index list of indices, one for each dimension. For vlen, the last is ignored.
+   * @param index multidimensional indices.
    */
   public abstract T get(Index index);
 
-  /** Return the datatype for this array */
+  /** Get the first element of the Array */
+  public T getScalar() {
+    return this.get(this.getIndex());
+  }
+
+  /** The datatype for this array */
   public DataType getDataType() {
     return this.dataType;
   }
 
+  /** Is variable length and will be represented by Vlen\<T\> */
+  public boolean isVlen() {
+    return false;
+  }
+
   /** An Index that can be used instead of int[], with the same rank as this Array. */
   public Index getIndex() {
-    return new Index(this.rank);
+    return new Index(this.rank, this.indexFn);
   }
 
   /** Get the number of dimensions of the array. */
@@ -62,11 +74,7 @@ public abstract class Array<T> implements Iterable<T> {
     return indexFn.length();
   }
 
-  /** Get the total number of bytes in the array. */
-  public long getSizeBytes() {
-    return indexFn.length() * dataType.getSize();
-  }
-
+  @Override
   public String toString() {
     StringBuilder sbuff = new StringBuilder();
     boolean first = true;
@@ -78,6 +86,26 @@ public abstract class Array<T> implements Iterable<T> {
       first = false;
     }
     return sbuff.toString();
+  }
+
+  /** Equal if the type and indexFn are equal, doesnt test the contents. TODO */
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof Array)) {
+      return false;
+    }
+    Array<?> array = (Array<?>) o;
+    return getRank() == array.getRank() && getDataType() == array.getDataType()
+        && Objects.equal(indexFn, array.indexFn);
+  }
+
+  /** Consistent with equals. */
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(getDataType(), indexFn, getRank());
   }
 
   //////////////////////////////////////////////////////////
@@ -99,7 +127,6 @@ public abstract class Array<T> implements Iterable<T> {
     this.indexFn = indexFn;
   }
 
-  // Mimic of System.arraycopy(Object src, int srcPos, Object dest, int destPos, int length);
   abstract void arraycopy(int srcPos, Object dest, int destPos, long length);
 
   /** Get underlying storage. */
@@ -113,10 +140,10 @@ public abstract class Array<T> implements Iterable<T> {
   /**
    * Create new Array with given IndexFn and the same backing store
    *
-   * @param index use this IndexFn
+   * @param view use this IndexFn
    * @return a view of the Array using the given IndexFn
    */
-  abstract Array<T> createView(IndexFn index);
+  abstract Array<T> createView(IndexFn view);
 
 }
 

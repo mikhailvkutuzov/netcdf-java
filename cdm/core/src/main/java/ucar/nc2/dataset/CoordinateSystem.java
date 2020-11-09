@@ -9,6 +9,7 @@ import com.google.common.collect.ImmutableList;
 import javax.annotation.Nullable;
 import ucar.nc2.*;
 import ucar.nc2.constants.AxisType;
+import ucar.nc2.grid.GridAxis;
 import ucar.unidata.geoloc.*;
 import java.util.*;
 import ucar.unidata.geoloc.projection.LatLonProjection;
@@ -82,8 +83,9 @@ public class CoordinateSystem {
 
   // prefer smaller ranks, in case more than one
   private CoordinateAxis lesserRank(CoordinateAxis a1, CoordinateAxis a2) {
-    if (a1 == null)
+    if (a1 == null) {
       return a2;
+    }
     return (a1.getRank() <= a2.getRank()) ? a1 : a2;
   }
 
@@ -148,14 +150,28 @@ public class CoordinateSystem {
    * @param type look for this axisType
    * @return CoordinateAxis of the given AxisType, else null.
    */
+  @Nullable
   public CoordinateAxis findAxis(AxisType type) {
     CoordinateAxis result = null;
     for (CoordinateAxis axis : coordAxes) {
       AxisType axisType = axis.getAxisType();
-      if ((axisType != null) && (axisType == type))
+      if ((axisType != null) && (axisType == type)) {
         result = lesserRank(result, axis);
+      }
     }
     return result;
+  }
+
+  /** Find CoordinateAxis of one of the given types, in the order given. */
+  @Nullable
+  public CoordinateAxis findAxis(AxisType... axisType) {
+    for (AxisType type : axisType) {
+      CoordinateAxis result = findAxis(type);
+      if (result != null) {
+        return result;
+      }
+    }
+    return null;
   }
 
   /**
@@ -163,7 +179,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.GeoX, or null if none
+   * @deprecated use findAxis(AxisType.GeoX)
    */
+  @Deprecated
   public CoordinateAxis getXaxis() {
     return xAxis;
   }
@@ -173,7 +191,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.GeoY, or null if none
+   * @deprecated use findAxis(AxisType.GeoY)
    */
+  @Deprecated
   public CoordinateAxis getYaxis() {
     return yAxis;
   }
@@ -183,7 +203,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.GeoZ, or null if none
+   * @deprecated use findAxis(AxisType.GeoZ)
    */
+  @Deprecated
   public CoordinateAxis getZaxis() {
     return zAxis;
   }
@@ -193,7 +215,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.Time, or null if none
+   * @deprecated use findAxis(AxisType.Time)
    */
+  @Deprecated
   public CoordinateAxis getTaxis() {
     return tAxis;
   }
@@ -203,7 +227,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.Lat, or null if none
+   * @deprecated use findAxis(AxisType.Lat)
    */
+  @Deprecated
   public CoordinateAxis getLatAxis() {
     return latAxis;
   }
@@ -213,7 +239,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank *
    * 
    * @return axis of type AxisType.Lon, or null if none
+   * @deprecated use findAxis(AxisType.Lon)
    */
+  @Deprecated
   public CoordinateAxis getLonAxis() {
     return lonAxis;
   }
@@ -223,7 +251,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.Height, or null if none
+   * @deprecated use findAxis(AxisType.Height)
    */
+  @Deprecated
   public CoordinateAxis getHeightAxis() {
     return hAxis;
   }
@@ -233,7 +263,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank.
    * 
    * @return axis of type AxisType.Pressure, or null if none
+   * @deprecated use findAxis(AxisType.Pressure)
    */
+  @Deprecated
   public CoordinateAxis getPressureAxis() {
     return pAxis;
   }
@@ -244,7 +276,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank.
    * 
    * @return axis of type AxisType.Ensemble, or null if none
+   * @deprecated use findAxis(AxisType.Ensemble)
    */
+  @Deprecated
   public CoordinateAxis getEnsembleAxis() {
     return ensAxis;
   }
@@ -254,7 +288,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.RadialAzimuth, or null if none
+   * @deprecated use findAxis(AxisType.RadialAzimuth)
    */
+  @Deprecated
   public CoordinateAxis getAzimuthAxis() {
     return aziAxis;
   }
@@ -264,7 +300,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.RadialDistance, or null if none
+   * @deprecated use findAxis(AxisType.RadialDistance)
    */
+  @Deprecated
   public CoordinateAxis getRadialAxis() {
     return radialAxis;
   }
@@ -274,7 +312,9 @@ public class CoordinateSystem {
    * if more than one, choose one with smallest rank
    * 
    * @return axis of type AxisType.RadialElevation, or null if none
+   * @deprecated use findAxis(AxisType.RadialElevation)
    */
+  @Deprecated
   public CoordinateAxis getElevationAxis() {
     return elevAxis;
   }
@@ -313,14 +353,16 @@ public class CoordinateSystem {
 
   ////////////////////////////////////////////////////////////////////////////
   // classification
+
   /**
    * true if it has X and Y CoordinateAxis, and a CoordTransform Projection
    * 
    * @return true if it has X and Y CoordinateAxis, and a CoordTransform Projection
    */
   public boolean isGeoXY() {
-    if ((xAxis == null) || (yAxis == null))
+    if ((xAxis == null) || (yAxis == null)) {
       return false;
+    }
     return null != getProjection() && !(projection instanceof LatLonProjection);
   }
 
@@ -355,11 +397,14 @@ public class CoordinateSystem {
    * true if all axes are CoordinateAxis1D
    * 
    * @return true if all axes are CoordinateAxis1D
+   * @deprecated do not use
    */
+  @Deprecated
   public boolean isProductSet() {
     for (CoordinateAxis axis : coordAxes) {
-      if (!(axis instanceof CoordinateAxis1D))
+      if (axis.getRank() != 1) {
         return false;
+      }
     }
     return true;
   }
@@ -368,13 +413,17 @@ public class CoordinateSystem {
    * true if all axes are CoordinateAxis1D and are regular
    *
    * @return true if all axes are CoordinateAxis1D and are regular
+   * @deprecated do not use
    */
+  @Deprecated
   public boolean isRegular() {
     for (CoordinateAxis axis : coordAxes) {
-      if (!(axis instanceof CoordinateAxis1D))
+      if (!(axis instanceof CoordinateAxis1D)) {
         return false;
-      if (!((CoordinateAxis1D) axis).isRegular())
+      }
+      if (!((CoordinateAxis1D) axis).isRegular()) {
         return false;
+      }
     }
     return true;
   }
@@ -386,7 +435,7 @@ public class CoordinateSystem {
    * @return true if all dimensions in V (including parents) are in the domain of this coordinate system.
    */
   public boolean isComplete(Variable v) {
-    return isSubset(Dimensions.makeDimensionsAll(v), domain);
+    return Dimensions.isSubset(Dimensions.makeDimensionsAll(v), domain);
   }
 
   /**
@@ -399,7 +448,7 @@ public class CoordinateSystem {
    * @return true if all dimensions in the domain of this coordinate system are in V (including parents).
    */
   public boolean isCoordinateSystemFor(Variable v) {
-    return isSubset(domain, Dimensions.makeDimensionsAll(v));
+    return Dimensions.isSubset(domain, Dimensions.makeDimensionsAll(v));
   }
 
   /**
@@ -408,23 +457,31 @@ public class CoordinateSystem {
    * @param subset is this a subset
    * @param set of this?
    * @return true if all the Dimensions in subset are in set
+   * @deprecated use Dimensions.isSubset()
    */
+  @Deprecated
   public static boolean isSubset(Collection<Dimension> subset, Collection<Dimension> set) {
     for (Dimension d : subset) {
-      if (!(set.contains(d)))
+      if (!(set.contains(d))) {
         return false;
+      }
     }
     return true;
   }
 
+  /** @deprecated use Dimensions.isSubset() */
+  @Deprecated
   public static boolean isSubset(Set<String> subset, Set<String> set) {
     for (String d : subset) {
-      if (!(set.contains(d)))
+      if (!(set.contains(d))) {
         return false;
+      }
     }
     return true;
   }
 
+  /** @deprecated use Dimensions.makeDomain() */
+  @Deprecated
   public static Set<Dimension> makeDomain(Iterable<? extends Variable> axes) {
     Set<Dimension> domain = new HashSet<>();
     for (Variable axis : axes) {
@@ -433,6 +490,8 @@ public class CoordinateSystem {
     return domain;
   }
 
+  /** @deprecated use Dimensions.makeDomain().size() */
+  @Deprecated
   public static int countDomain(Variable[] axes) {
     Set<Dimension> domain = new HashSet<>();
     for (Variable axis : axes) {
@@ -456,7 +515,9 @@ public class CoordinateSystem {
    * true if has Height, Pressure, or GeoZ axis
    * 
    * @return true if has a vertical axis
+   * @deprecated use findAxis(...)
    */
+  @Deprecated
   public boolean hasVerticalAxis() {
     return (hAxis != null) || (pAxis != null) || (zAxis != null);
   }
@@ -465,21 +526,19 @@ public class CoordinateSystem {
    * true if has Time axis
    * 
    * @return true if has Time axis
+   * @deprecated use findAxis(...)
    */
+  @Deprecated
   public boolean hasTimeAxis() {
     return (tAxis != null);
   }
 
-  /**
-   * Do we have all the axes in the list?
-   * 
-   * @param wantAxes List of CoordinateAxis
-   * @return true if all in our list.
-   */
+  /** Do we have all the axes in wantAxes, matching on full name */
   public boolean containsAxes(List<CoordinateAxis> wantAxes) {
     for (CoordinateAxis ca : wantAxes) {
-      if (!containsAxis(ca.getFullName()))
+      if (!containsAxis(ca.getFullName())) {
         return false;
+      }
     }
     return true;
   }
@@ -498,26 +557,22 @@ public class CoordinateSystem {
     return false;
   }
 
-  /**
-   * Do we have all the dimensions in the list?
-   * 
-   * @param wantDimensions List of Dimensions
-   * @return true if all in our list.
-   */
+  /** Do we have all the dimensions in wantDimensions? */
   public boolean containsDomain(List<Dimension> wantDimensions) {
     for (Dimension d : wantDimensions) {
-      if (!domain.contains(d))
+      if (!domain.contains(d)) {
         return false;
+      }
     }
     return true;
   }
 
   /**
-   * Do we have all the axes types in the list?
+   * Do we have all the axes types in wantAxes?
    * 
-   * @param wantAxes List of AxisType
-   * @return true if all in our list.
+   * @deprecated use findAxis(...)
    */
+  @Deprecated
   public boolean containsAxisTypes(List<AxisType> wantAxes) {
     for (AxisType wantAxisType : wantAxes) {
       if (!containsAxisType(wantAxisType))
@@ -526,21 +581,22 @@ public class CoordinateSystem {
     return true;
   }
 
-
   /**
-   * Do we have an axes of the given type?
+   * Do we have an axis of the given type?
    * 
    * @param wantAxisType want this AxisType
    * @return true if we have at least one axis of that type.
+   * @deprecated use findAxis(...)
    */
+  @Deprecated
   public boolean containsAxisType(AxisType wantAxisType) {
     for (CoordinateAxis ca : coordAxes) {
-      if (ca.getAxisType() == wantAxisType)
+      if (ca.getAxisType() == wantAxisType) {
         return true;
+      }
     }
     return false;
   }
-
 
   ////////////////////////////////////////////////////////////////////////////
   /**
