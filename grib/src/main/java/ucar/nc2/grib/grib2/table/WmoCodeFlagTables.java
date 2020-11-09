@@ -45,16 +45,21 @@ public class WmoCodeFlagTables {
     param, code, flag, cat
   }
 
-  private static WmoCodeFlagTables instance;
+  private static volatile WmoCodeFlagTables instance;
 
   public static WmoCodeFlagTables getInstance() {
     if (instance == null) {
-      instance = new WmoCodeFlagTables();
-      try {
-        instance.readGribCodes(standard);
-      } catch (IOException e) {
-        logger.error("Cant read WMO Grib2 tables");
-        throw new RuntimeException(e);
+      synchronized (WmoCodeFlagTables.class) {
+        if (instance == null) {
+          WmoCodeFlagTables flagTables = new WmoCodeFlagTables();
+          try {
+            flagTables.readGribCodes(standard);
+            instance = flagTables;
+          } catch (IOException e) {
+            logger.error("Cant read WMO Grib2 tables");
+            throw new RuntimeException(e);
+          }
+        }
       }
     }
     return instance;
